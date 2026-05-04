@@ -43,3 +43,14 @@ def product(slug):
     else:
         response = jsonify({'message': 'Cannot find product'}), 404
     return response
+
+from flask import jsonify
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+@product_api_blueprint.route('/health', methods=['GET'])
+def product_health():
+    return jsonify({'status': 'healthy', 'service': 'product-service'}), 200
+
+@product_api_blueprint.route('/metrics', methods=['GET'])
+def product_metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}

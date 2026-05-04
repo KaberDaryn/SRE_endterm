@@ -1,0 +1,151 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "assignment6-sre",
+    "title": "Assignment 6 SRE Microservices Dashboard",
+    "tags": ["assignment-6", "sre", "microservices", "postgresql"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "5s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "timeseries",
+        "title": "Prometheus Target Availability",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "{{job}} - {{instance}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "type": "stat",
+        "title": "Total UP Targets",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "sum(up)",
+            "legendFormat": "UP targets",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 3,
+        "type": "timeseries",
+        "title": "Container CPU Usage",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=~\"cfrontend-app|cuser-service|cproduct-service|corder-service|cuser_dbase|cproduct_dbase|corder_dbase\"}[1m])",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 8,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "type": "timeseries",
+        "title": "Container Memory Usage",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{name=~\"cfrontend-app|cuser-service|cproduct-service|corder-service|cuser_dbase|cproduct_dbase|corder_dbase\"}",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 16,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "type": "timeseries",
+        "title": "Application Process CPU",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[1m])",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 7,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        }
+      },
+      {
+        "id": 6,
+        "type": "timeseries",
+        "title": "Application Resident Memory",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 7,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}

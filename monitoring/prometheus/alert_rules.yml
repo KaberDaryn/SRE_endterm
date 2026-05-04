@@ -1,0 +1,97 @@
+﻿groups:
+  - name: service_availability
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been unreachable for more than 1 minute."
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name!=""}[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+
+  - name: resource_usage
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.name }}"
+
+      - alert: CriticalCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU usage on {{ $labels.name }}"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name!=""} > 500000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.name }}"
+          description: "Container memory usage is above 500 MB."
+
+      - alert: HostHighCPU
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU above 85%"
+
+      - alert: HostLowDisk
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on host"
+
+  - name: microservices
+    rules:
+      - alert: UserServiceDown
+        expr: up{job="user-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "User Service is down"
+
+      - alert: ProductServiceDown
+        expr: up{job="product-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Product Service is down"
+
+      - alert: OrderServiceDown
+        expr: up{job="order-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order Service is down"
+          description: "Order Service is the primary bottleneck for capacity planning."
+
+      - alert: FrontendDown
+        expr: up{job="frontend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Frontend is down"

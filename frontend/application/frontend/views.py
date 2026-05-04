@@ -139,3 +139,13 @@ def thank_you():
     flash('Thank you for your order', 'success')
 
     return render_template('order/thankyou.html')
+from flask import jsonify
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+@frontend_blueprint.route('/health', methods=['GET'])
+def frontend_health():
+    return jsonify({'status': 'healthy', 'service': 'frontend'}), 200
+
+@frontend_blueprint.route('/metrics', methods=['GET'])
+def frontend_metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}

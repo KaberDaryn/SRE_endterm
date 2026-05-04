@@ -1,134 +1,105 @@
-# Mastering Microservices with Python, Flask, and Docker
-Interested in microservices, and how they can be used for increased agility and scalability?
+﻿# Assignment 6 - SRE Automation and Capacity Planning
 
-Microservices is an architectural style and pattern that structures an application as a collection of coherent services. Each service is highly maintainable, testable, loosely coupled, independently deployable, and precisely focused.
+Student: Kaber Daryn
 
-This [course](https://cloudacademy.com/course/mastering-microservices-with-python-flask-docker-1118) takes a hands-on look at microservices using Python, Flask, and Docker. You'll learn how Flask can be used to quickly prototype and build microservices, as well as how to use Docker to host and deploy them.
+## Overview
 
-:metal:
+This project demonstrates SRE automation, monitoring, alerting, capacity planning, and recovery for a containerized Python Flask microservices system.
 
-## Project Structure
-The Python Flask based microservices project is composed of the following 4 projects: 
-* [frontend](https://github.com/cloudacademy/python-flask-microservices/tree/master/frontend)
-* [user-service](https://github.com/cloudacademy/python-flask-microservices/tree/master/user-service)
-* [product-service](https://github.com/cloudacademy/python-flask-microservices/tree/master/product-service)
-* [order-service](https://github.com/cloudacademy/python-flask-microservices/tree/master/order-service)
+## Technology Stack
 
-## Microservices Setup and Configuration
-To launch the end-to-end microservices application perform the following:
+- Docker Compose
+- Nginx reverse proxy
+- Python Flask frontend
+- User Service
+- Product Service
+- Order Service
+- PostgreSQL 15
+- Prometheus
+- Grafana
+- cAdvisor
+- node-exporter
+- Terraform configuration
 
-### Step 1.
-Navigate into the [frontend](https://github.com/cloudacademy/python-flask-microservices/tree/master/frontend) directory, and confirm the presence of the ```docker-compose.deploy.yml``` file:
-```
-cd frontend
-ls -la
-```
+## Architecture
 
-### Step 1.
-Create a new Docker network and name it ```micro_network```:
-```
-docker network create micro_network
-```
+Validated request path:
 
-### Step 2.
-Build each of the microservice Docker container images:
-```
-docker-compose -f docker-compose.deploy.yml build
-docker images
-```
+User / Browser -> Nginx Reverse Proxy -> Flask Frontend -> Product Service -> PostgreSQL Product Database
 
-### Step 3.
-Launch the microservice environment:
-```
-docker-compose -f docker-compose.deploy.yml build
-docker ps -a
-```
+Supporting services:
 
-### Step 4.
-Prepare each microservice mysql database:
-```
-for service in corder-service cproduct-service cuser-service;
-do 
- docker exec -it $service flask db init
- docker exec -it $service flask db migrate
- docker exec -it $service flask db upgrade
-done
-```
+- User Service uses PostgreSQL User Database.
+- Product Service uses PostgreSQL Product Database.
+- Order Service uses PostgreSQL Orders Database.
+- Prometheus scrapes application, host, and container metrics.
+- Grafana visualizes Prometheus metrics.
+- cAdvisor provides container-level metrics.
+- node-exporter provides host-level metrics.
 
-### Step 5.
-Populate the product database:
-```
-curl -i -d "name=prod1&slug=prod1&image=product1.jpg&price=100" -X POST localhost:5002/api/product/create
-curl -i -d "name=prod2&slug=prod2&image=product2.jpg&price=200" -X POST localhost:5002/api/product/create
-```
+## Run
 
-### Step 6.
-Using your workstations browser - navigate to the following URL and register:
-```
-http://localhost:5000/register
-```
+docker compose up -d --build
 
-### Step 7.
-Back within your terminal, use a mysql client to confirm that a new user registration record was created:
-```
-mysql --host=127.0.0.1 --port=32000 --user=cloudacademy --password=pfm_2020
-mysql> show databases;
-mysql> use user;
-mysql> show tables;
-mysql> select * from user;
-mysql> exit
-```
+## Validate
 
-### Step 8.
-Using your workstations browser - login, and add products into your cart, and then finally click the checkout option
-```
-http://localhost:5000/login
-```
+.\validate_config.ps1
 
-### Step 9.
-Back within your terminal, use a mysql client to confirm that a new order has been created:
-```
-mysql --host=127.0.0.1 --port=32002 --user=cloudacademy --password=pfm_2020
-mysql> show databases;
-mysql> use order;
-mysql> show tables;
-mysql> select * from order.order;
-mysql> select * from order.order_item;
-mysql> exit
-```
+Expected result:
 
-## Microservices Teardown
-Perform the following steps to teardown the microservices environment:
+VALIDATION PASSED: configuration and endpoints are ready.
 
-### Step 1.
-Create a new Docker network and name it ```micro_network```:
-```
-for container in cuser-service cproduct-service corder-service cproduct_dbase cfrontend-app cuser_dbase corder_dbase;
-do
- docker stop $container
- docker rm $container
-done
-```
+## Log inspection
 
-### Step 2.
-Remove the container volumes
-```
-for vol in frontend_orderdb_vol frontend_productdb_vol frontend_userdb_vol;
-do
- docker volume rm $vol
-done
-```
+.\check_logs_clean.ps1
 
-### Step 3.
-Remove the container network
-```
-docker network rm micro_network
-```
+Expected result:
 
-## Python extensions reference
-The following Python extensions were used:
+LOG INSPECTION PASSED: no critical runtime errors found in application or monitoring services.
 
-* Flask-SQLAlchemy: https://flask-sqlalchemy.palletsprojects.com/en/2.x/
-* Flask-Login: https://flask-login.readthedocs.io/en/latest/
-* Flask-Migrate: https://github.com/miguelgrinberg/flask-migrate/
-* Requests: https://requests.readthedocs.io/en/master/
+## PostgreSQL verification
+
+Check PostgreSQL version:
+
+docker exec -i cproduct_dbase psql -U cloudacademy -d product -c "SELECT version();"
+
+Check product records:
+
+docker exec -i cproduct_dbase psql -U cloudacademy -d product -c "SELECT id, name, slug, price, image FROM product;"
+
+## Main endpoints
+
+- Frontend through Nginx: http://localhost:8081
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+- cAdvisor: http://localhost:8080
+- Product API: http://localhost:5002/api/products
+
+## Capacity test
+
+docker cp capacity_matrix.py cfrontend-app:/tmp/capacity_matrix.py
+docker exec cfrontend-app python /tmp/capacity_matrix.py
+
+The PostgreSQL-backed stress test sustained 1,000/1,000 successful requests at concurrency 100 with 0.00% error rate.
+
+## Alert rule validation
+
+docker run --rm --entrypoint promtool -v ${PWD}\monitoring\prometheus:/etc/prometheus prom/prometheus:latest check rules /etc/prometheus/alert_rules.yml
+
+Expected result:
+
+SUCCESS: 11 rules found
+
+## Self-healing validation
+
+Order Service recovery was validated through a controlled failure-injection endpoint. Docker restart policy recovered the service, RestartCount increased from 0 to 1, and /health returned HTTP 200 after recovery.
+
+## Final Report
+
+Final Assignment 6 report:
+
+- `docs/SRE_6_Kaber_Daryn.pdf`
+
+Supporting evidence screenshots:
+
+- `evidence/screenshots/`

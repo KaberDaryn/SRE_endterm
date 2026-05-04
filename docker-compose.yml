@@ -1,0 +1,221 @@
+services:
+  frontend-app:
+    container_name: cfrontend-app
+    build:
+      context: ./frontend
+    ports:
+      - "5000:5000"
+    depends_on:
+      - user-api
+      - product-api
+      - order-api
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  user-api:
+    container_name: cuser-service
+    build:
+      context: ./user-service
+    ports:
+      - "5001:5001"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  user-db:
+    container_name: cuser_dbase
+    image: postgres:15
+    ports:
+      - "32000:5432"
+    environment:
+      POSTGRES_DB: user
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    networks:
+      - micro_network
+    volumes:
+      - userdb_vol:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudacademy -d user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  product-api:
+    container_name: cproduct-service
+    build:
+      context: ./product-service
+    ports:
+      - "5002:5002"
+    depends_on:
+      product-db:
+        condition: service_healthy
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  product-db:
+    container_name: cproduct_dbase
+    image: postgres:15
+    ports:
+      - "32001:5432"
+    environment:
+      POSTGRES_DB: product
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    networks:
+      - micro_network
+    volumes:
+      - productdb_vol:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudacademy -d product"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  order-api:
+    container_name: corder-service
+    build:
+      context: ./order-service
+    ports:
+      - "5003:5003"
+    depends_on:
+      order-db:
+        condition: service_healthy
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  order-db:
+    container_name: corder_dbase
+    image: postgres:15
+    ports:
+      - "32002:5432"
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    networks:
+      - micro_network
+    volumes:
+      - orderdb_vol:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudacademy -d orders"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - micro_network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - micro_network
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - micro_network
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - micro_network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx-frontend
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend-app
+    networks:
+      - micro_network
+    restart: unless-stopped
+
+networks:
+  micro_network:
+    name: micro_network
+    driver: bridge
+
+volumes:
+  userdb_vol:
+  productdb_vol:
+  orderdb_vol:
+  prometheus_data:
+  grafana_data:

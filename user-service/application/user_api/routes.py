@@ -98,3 +98,13 @@ def get_user():
         return make_response(jsonify({'result': current_user.to_json()}))
 
     return make_response(jsonify({'message': 'Not logged in'})), 401
+from flask import jsonify
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+@user_api_blueprint.route('/health', methods=['GET'])
+def user_health():
+    return jsonify({'status': 'healthy', 'service': 'user-service'}), 200
+
+@user_api_blueprint.route('/metrics', methods=['GET'])
+def user_metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}

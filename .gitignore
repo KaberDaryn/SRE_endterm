@@ -1,6 +1,43 @@
-.idea/
-.git/
+﻿# Python
 __pycache__/
-*.py[cod]
-*$py.class
-migrations/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Terraform local cache/state
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local-only / old artifacts
+_not_for_submission/
+*.backup
+*.backup.yml
+*.mysql.yml
+*.env.mysql.backup
+docker-compose.mysql.backup.yml
+
+# Old or intermediate generated files
+capacity_matrix_results.txt
+load_test.py
+load_test_docker.py
+check_logs.ps1
+self_healing_demo.ps1
+
+# Logs
+*.log

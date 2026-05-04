@@ -94,3 +94,20 @@ def checkout():
 
     response = jsonify({'result': order_model.to_json()})
     return response
+
+from flask import jsonify
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+@order_api_blueprint.route('/health', methods=['GET'])
+def order_health():
+    return jsonify({'status': 'healthy', 'service': 'order-service'}), 200
+
+@order_api_blueprint.route('/metrics', methods=['GET'])
+def order_metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+import os
+
+@order_api_blueprint.route('/crash', methods=['GET'])
+def order_crash():
+    os._exit(1)

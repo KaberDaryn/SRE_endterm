@@ -1,4 +1,4 @@
-# config.py
+﻿# config.py
 import os
 from dotenv import load_dotenv
 
@@ -14,10 +14,10 @@ class Config:
 class DevelopmentConfig(Config):
     ENV = "development"
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://cloudacademy:pfm_2020@localhost:3306/product_dev'
+    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://cloudacademy:pfm_2020@host.docker.internal:32001/product'
 
 
 class ProductionConfig(Config):
     ENV = "production"
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://cloudacademy:pfm_2020@product-db:3306/product'
+    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://cloudacademy:pfm_2020@product-db:5432/product'
