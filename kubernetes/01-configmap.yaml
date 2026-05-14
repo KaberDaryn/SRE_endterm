@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: sre-microservices
+data:
+  POSTGRES_USER: cloudacademy
+  POSTGRES_PASSWORD: pfm_2020
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: services-config
+  namespace: sre-microservices
+data:
+  USER_SERVICE_URL: "http://user-api:5001"
+  PRODUCT_SERVICE_URL: "http://product-api:5002"
+  ORDER_SERVICE_URL: "http://order-api:5003"
+  NOTIFICATION_SERVICE_URL: "http://notification-api:5004"
+  PAYMENT_SERVICE_URL: "http://payment-api:5005"

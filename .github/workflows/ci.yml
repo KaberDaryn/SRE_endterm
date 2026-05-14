@@ -1,0 +1,181 @@
+name: SRE End-Term CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ─── JOB 1: Validate Configuration Files ───
+  validate-config:
+    name: Validate Configs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+        
+      - name: Validate Prometheus config
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/monitoring/prometheus:/etc/prometheus \
+            prom/prometheus:latest \
+            promtool check config /etc/prometheus/prometheus.yml
+
+      - name: Validate alert rules
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/monitoring/prometheus:/etc/prometheus \
+            prom/prometheus:latest \
+            promtool check rules /etc/prometheus/alert_rules.yml
+
+      - name: Validate Kubernetes manifests
+        uses: azure/k8s-lint@v1
+        with:
+          manifests: kubernetes/
+
+      - name: Validate Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      - run: |
+          cd terraform
+          terraform init -backend=false
+          terraform validate
+
+  # ─── JOB 2: Build Docker Images ───
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: validate-config
+    strategy:
+      matrix:
+        service:
+          - { name: user-service,         context: ./user-service }
+          - { name: product-service,      context: ./product-service }
+          - { name: order-service,        context: ./order-service }
+          - { name: notification-service, context: ./notification-service }
+          - { name: payment-service,      context: ./payment-service }
+          - { name: frontend,             context: ./frontend }
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build ${{ matrix.service.name }}
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.service.context }}
+          push: false
+          tags: sre-${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── JOB 3: Integration Test ───
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Start all services
+        run: docker compose up -d --build
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services..."
+          sleep 40
+
+      - name: Check all service health endpoints
+        run: |
+          services=(
+            "http://localhost:5001/health:user-service"
+            "http://localhost:5002/health:product-service"
+            "http://localhost:5003/health:order-service"
+            "http://localhost:5004/health:notification-service"
+            "http://localhost:5005/health:payment-service"
+          )
+          
+          all_ok=true
+          for entry in "${services[@]}"; do
+            url="${entry%%:*}"
+            name="${entry##*:}"
+            response=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+            if [ "$response" = "200" ]; then
+              echo "✓ $name is healthy (HTTP $response)"
+            else
+              echo "✗ $name failed (HTTP $response)"
+              all_ok=false
+            fi
+          done
+          
+          if [ "$all_ok" = false ]; then
+            echo "Some services failed health checks"
+            docker compose ps
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Test Product API returns data
+        run: |
+          docker exec cproduct-service python seed.py
+          sleep 3
+          response=$(curl -s http://localhost:5002/api/products)
+          echo "Product API response: $response"
+          echo "$response" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert 'results' in data, 'Missing results key'
+          print(f'Product API OK - {len(data[\"results\"])} products')
+          "
+
+      - name: Test Prometheus is scraping
+        run: |
+          sleep 20
+          response=$(curl -s http://localhost:9090/api/v1/targets)
+          echo "$response" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          targets = data['data']['activeTargets']
+          up = [t for t in targets if t['health'] == 'up']
+          print(f'Prometheus: {len(up)}/{len(targets)} targets UP')
+          assert len(up) >= 5, f'Expected at least 5 UP targets, got {len(up)}'
+          "
+
+      - name: Test Incident Simulation (Self-Healing)
+        run: |
+          echo "Triggering Order Service crash..."
+          curl -s http://localhost:5003/crash || true
+          echo "Waiting for Docker restart policy..."
+          sleep 25
+          
+          restart_count=$(docker inspect corder-service --format='{{.RestartCount}}')
+          echo "RestartCount: $restart_count"
+          
+          health=$(curl -s http://localhost:5003/health)
+          echo "Health after recovery: $health"
+          
+          echo "$health" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] == 'healthy', f'Service not healthy: {data}'
+          print('Self-healing verified!')
+          "
+
+      - name: Print service logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=50
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v

@@ -1,105 +1,171 @@
-﻿# Assignment 6 - SRE Automation and Capacity Planning
+# SRE End-Term Project
+## End-to-End SRE Implementation for a Distributed Microservices System
+**Student:** Kaber Daryn | **Group:** SE-2430
 
-Student: Kaber Daryn
-
-## Overview
-
-This project demonstrates SRE automation, monitoring, alerting, capacity planning, and recovery for a containerized Python Flask microservices system.
-
-## Technology Stack
-
-- Docker Compose
-- Nginx reverse proxy
-- Python Flask frontend
-- User Service
-- Product Service
-- Order Service
-- PostgreSQL 15
-- Prometheus
-- Grafana
-- cAdvisor
-- node-exporter
-- Terraform configuration
+---
 
 ## Architecture
 
-Validated request path:
+```
+User -> Nginx (8081)
+         |
+   Flask Frontend (5000)
+         |
+   +----------+----------+---------+--------------+------------+
+   |          |          |         |              |            |
+User API  Product API  Order API  Notification  Payment API
+(5001)    (5002)       (5003)     API (5004)    (5005)
+   |          |          |         |              |
+  DB         DB         DB        DB             DB
+ (PG)       (PG)       (PG)      (PG)           (PG)
 
-User / Browser -> Nginx Reverse Proxy -> Flask Frontend -> Product Service -> PostgreSQL Product Database
+Observability: Prometheus(9090) -> Grafana(3000)
+               node-exporter(9100) + cAdvisor(8080)
+```
 
-Supporting services:
+---
 
-- User Service uses PostgreSQL User Database.
-- Product Service uses PostgreSQL Product Database.
-- Order Service uses PostgreSQL Orders Database.
-- Prometheus scrapes application, host, and container metrics.
-- Grafana visualizes Prometheus metrics.
-- cAdvisor provides container-level metrics.
-- node-exporter provides host-level metrics.
+## Services (6 Microservices)
 
-## Run
+| Service          | Port | Role                        |
+|------------------|------|-----------------------------|
+| Frontend         | 5000 | Flask web UI                |
+| User API         | 5001 | Auth & user management      |
+| Product API      | 5002 | Product catalog             |
+| Order API        | 5003 | Order processing            |
+| Notification API | 5004 | Email/alert simulation      |
+| Payment API      | 5005 | Payment handling simulation |
+| Nginx            | 8081 | Reverse proxy               |
+| Prometheus       | 9090 | Metrics collection          |
+| Grafana          | 3000 | Dashboards (admin/admin123) |
 
+---
+
+## Method 1 — Docker Compose
+
+```bash
 docker compose up -d --build
+docker compose ps
+```
 
-## Validate
+Stop:
+```bash
+docker compose down -v
+```
 
-.\validate_config.ps1
+Seed product data:
+```bash
+docker exec cproduct-service python seed.py
+```
 
-Expected result:
+---
 
-VALIDATION PASSED: configuration and endpoints are ready.
+## Method 2 — Docker Swarm
 
-## Log inspection
+```bash
+# Initialize Swarm
+docker swarm init
 
-.\check_logs_clean.ps1
+# Build images
+docker build -t sre-frontend:latest ./frontend
+docker build -t sre-user-service:latest ./user-service
+docker build -t sre-product-service:latest ./product-service
+docker build -t sre-order-service:latest ./order-service
+docker build -t sre-notification-service:latest ./notification-service
+docker build -t sre-payment-service:latest ./payment-service
 
-Expected result:
+# Deploy stack
+docker stack deploy -c docker-compose.swarm.yml sre-app
+docker service ls
 
-LOG INSPECTION PASSED: no critical runtime errors found in application or monitoring services.
+# Scale a service
+docker service scale sre-app_order-api=3
+```
 
-## PostgreSQL verification
+---
 
-Check PostgreSQL version:
+## Method 3 — Kubernetes
 
-docker exec -i cproduct_dbase psql -U cloudacademy -d product -c "SELECT version();"
+```bash
+# Start minikube
+minikube start
 
-Check product records:
+# Load images
+minikube image load sre-user-service:latest
+minikube image load sre-product-service:latest
+minikube image load sre-order-service:latest
+minikube image load sre-notification-service:latest
+minikube image load sre-payment-service:latest
 
-docker exec -i cproduct_dbase psql -U cloudacademy -d product -c "SELECT id, name, slug, price, image FROM product;"
+# Apply manifests
+kubectl apply -f kubernetes/
 
-## Main endpoints
+# Verify
+kubectl get all -n sre-microservices
 
-- Frontend through Nginx: http://localhost:8081
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000
-- cAdvisor: http://localhost:8080
-- Product API: http://localhost:5002/api/products
+# Open Grafana
+minikube service grafana -n sre-microservices
+```
 
-## Capacity test
+---
 
-docker cp capacity_matrix.py cfrontend-app:/tmp/capacity_matrix.py
-docker exec cfrontend-app python /tmp/capacity_matrix.py
+## Method 4 — Ansible
 
-The PostgreSQL-backed stress test sustained 1,000/1,000 successful requests at concurrency 100 with 0.00% error rate.
+```bash
+cd ansible/
+# Edit inventory.ini with your VM IP
+ansible-playbook -i inventory.ini playbook.yml
+```
 
-## Alert rule validation
+---
 
-docker run --rm --entrypoint promtool -v ${PWD}\monitoring\prometheus:/etc/prometheus prom/prometheus:latest check rules /etc/prometheus/alert_rules.yml
+## Terraform (IaC)
 
-Expected result:
+```bash
+cd terraform/
+cp terraform.tfvars.example terraform.tfvars
+# Fill in terraform.tfvars
 
-SUCCESS: 11 rules found
+terraform init
+terraform plan
+terraform apply
+```
 
-## Self-healing validation
+---
 
-Order Service recovery was validated through a controlled failure-injection endpoint. Docker restart policy recovered the service, RestartCount increased from 0 to 1, and /health returned HTTP 200 after recovery.
+## Incident Simulation
 
-## Final Report
+```bash
+# Crash Order Service
+curl http://localhost:5003/crash
 
-Final Assignment 6 report:
+# Observe automatic recovery (Docker restart policy)
+docker inspect corder-service | grep RestartCount
 
-- `docs/SRE_6_Kaber_Daryn.pdf`
+# Verify health after recovery
+curl http://localhost:5003/health
+```
 
-Supporting evidence screenshots:
+Automated rollback tool:
+```bash
+python rollback.py --status
+python rollback.py --auto
+python rollback.py --service order-api
+```
 
-- `evidence/screenshots/`
+---
+
+## SLI / SLO
+
+| SLI          | SLO      | Window  |
+|--------------|----------|---------|
+| Availability | >= 99%   | 30 days |
+| Latency p95  | <= 200ms | 30 days |
+| Error rate   | <= 1%    | 30 days |
+| Success rate | >= 99%   | 30 days |
+
+---
+
+## GitHub Repository
+
+[https://github.com/KaberDaryn/SRE-endterm](https://github.com/KaberDaryn/SRE-endterm)

@@ -1,0 +1,57 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sre-ingress
+  namespace: sre-microservices
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sre.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-app
+                port:
+                  number: 5000
+          - path: /api/users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-api
+                port:
+                  number: 5001
+          - path: /api/products
+            pathType: Prefix
+            backend:
+              service:
+                name: product-api
+                port:
+                  number: 5002
+          - path: /api/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-api
+                port:
+                  number: 5003
+          - path: /api/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-api
+                port:
+                  number: 5004
+          - path: /api/payments
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-api
+                port:
+                  number: 5005

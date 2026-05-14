@@ -1,4 +1,4 @@
-﻿groups:
+groups:
   - name: service_availability
     rules:
       - alert: ServiceDown
@@ -17,49 +17,6 @@
           severity: warning
         annotations:
           summary: "Container {{ $labels.name }} is restarting frequently"
-
-  - name: resource_usage
-    rules:
-      - alert: HighCPUUsage
-        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage on {{ $labels.name }}"
-
-      - alert: CriticalCPUUsage
-        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 95
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Critical CPU usage on {{ $labels.name }}"
-
-      - alert: HighMemoryUsage
-        expr: container_memory_usage_bytes{name!=""} > 500000000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High memory usage on {{ $labels.name }}"
-          description: "Container memory usage is above 500 MB."
-
-      - alert: HostHighCPU
-        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Host CPU above 85%"
-
-      - alert: HostLowDisk
-        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Low disk space on host"
 
   - name: microservices
     rules:
@@ -86,7 +43,24 @@
           severity: critical
         annotations:
           summary: "Order Service is down"
-          description: "Order Service is the primary bottleneck for capacity planning."
+          description: "Order Service failure blocks all order creation."
+
+      - alert: NotificationServiceDown
+        expr: up{job="notification-service"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notification Service is down"
+
+      - alert: PaymentServiceDown
+        expr: up{job="payment-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment Service is down"
+          description: "Payment Service failure blocks all transactions."
 
       - alert: FrontendDown
         expr: up{job="frontend"} == 0
@@ -95,3 +69,76 @@
           severity: critical
         annotations:
           summary: "Frontend is down"
+
+  - name: resource_usage
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.name }}"
+
+      - alert: CriticalCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU usage on {{ $labels.name }}"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name!=""} > 500000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.name }} (>500MB)"
+
+      - alert: HostHighCPU
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU above 85%"
+
+      - alert: HostLowDisk
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on host (<15% free)"
+
+  - name: error_rate_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_server_errors_total[5m]) / rate(http_requests_total[5m]) * 100 > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }} (>1%)"
+          description: "SLO breach imminent — error rate exceeds 1% for 5 minutes."
+
+  - name: slo_alerts
+    rules:
+      - alert: SLOAvailabilityBreach
+        expr: avg_over_time(up[30m]) < 0.99
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SLO Availability breach — below 99%"
+          description: "Service availability dropped below 99% SLO threshold."
+
+      - alert: SLOLatencyBreach
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SLO Latency breach — p95 > 200ms"
+          description: "95th percentile latency exceeded 200ms SLO threshold."

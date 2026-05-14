@@ -1,4 +1,5 @@
 services:
+  # ─────────────────────── FRONTEND ───────────────────────
   frontend-app:
     container_name: cfrontend-app
     build:
@@ -19,6 +20,7 @@ services:
       retries: 3
       start_period: 20s
 
+  # ─────────────────────── USER SERVICE ───────────────────────
   user-api:
     container_name: cuser-service
     build:
@@ -59,6 +61,7 @@ services:
       retries: 5
       start_period: 30s
 
+  # ─────────────────────── PRODUCT SERVICE ───────────────────────
   product-api:
     container_name: cproduct-service
     build:
@@ -99,6 +102,7 @@ services:
       retries: 5
       start_period: 30s
 
+  # ─────────────────────── ORDER SERVICE ───────────────────────
   order-api:
     container_name: corder-service
     build:
@@ -139,6 +143,89 @@ services:
       retries: 5
       start_period: 30s
 
+  # ─────────────────────── NOTIFICATION SERVICE (NEW) ───────────────────────
+  notification-api:
+    container_name: cnotification-service
+    build:
+      context: ./notification-service
+    ports:
+      - "5004:5004"
+    depends_on:
+      notification-db:
+        condition: service_healthy
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  notification-db:
+    container_name: cnotification_dbase
+    image: postgres:15
+    ports:
+      - "32003:5432"
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    networks:
+      - micro_network
+    volumes:
+      - notificationdb_vol:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudacademy -d notifications"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────── PAYMENT SERVICE (NEW) ───────────────────────
+  payment-api:
+    container_name: cpayment-service
+    build:
+      context: ./payment-service
+    ports:
+      - "5005:5005"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    networks:
+      - micro_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  payment-db:
+    container_name: cpayment_dbase
+    image: postgres:15
+    ports:
+      - "32004:5432"
+    environment:
+      POSTGRES_DB: payments
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    networks:
+      - micro_network
+    volumes:
+      - paymentdb_vol:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudacademy -d payments"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────── MONITORING ───────────────────────
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -195,6 +282,7 @@ services:
       - micro_network
     restart: unless-stopped
 
+  # ─────────────────────── NGINX REVERSE PROXY ───────────────────────
   nginx:
     image: nginx:latest
     container_name: nginx-frontend
@@ -217,5 +305,7 @@ volumes:
   userdb_vol:
   productdb_vol:
   orderdb_vol:
+  notificationdb_vol:
+  paymentdb_vol:
   prometheus_data:
   grafana_data:

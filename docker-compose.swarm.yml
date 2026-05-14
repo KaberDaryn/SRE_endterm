@@ -1,0 +1,297 @@
+version: "3.8"
+
+services:
+  frontend-app:
+    image: sre-frontend:latest
+    ports:
+      - "5000:5000"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 15s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+
+  user-api:
+    image: sre-user-service:latest
+    ports:
+      - "5001:5001"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+
+  user-db:
+    image: postgres:15
+    networks:
+      - micro_network
+    environment:
+      POSTGRES_DB: user
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    volumes:
+      - userdb_vol:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  product-api:
+    image: sre-product-service:latest
+    ports:
+      - "5002:5002"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+
+  product-db:
+    image: postgres:15
+    networks:
+      - micro_network
+    environment:
+      POSTGRES_DB: product
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    volumes:
+      - productdb_vol:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  order-api:
+    image: sre-order-service:latest
+    ports:
+      - "5003:5003"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+
+  order-db:
+    image: postgres:15
+    networks:
+      - micro_network
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    volumes:
+      - orderdb_vol:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  notification-api:
+    image: sre-notification-service:latest
+    ports:
+      - "5004:5004"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  notification-db:
+    image: postgres:15
+    networks:
+      - micro_network
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    volumes:
+      - notificationdb_vol:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  payment-api:
+    image: sre-payment-service:latest
+    ports:
+      - "5005:5005"
+    networks:
+      - micro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+
+  payment-db:
+    image: postgres:15
+    networks:
+      - micro_network
+    environment:
+      POSTGRES_DB: payments
+      POSTGRES_USER: cloudacademy
+      POSTGRES_PASSWORD: pfm_2020
+    volumes:
+      - paymentdb_vol:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    networks:
+      - micro_network
+    volumes:
+      - prometheus_data:/prometheus
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    networks:
+      - micro_network
+    volumes:
+      - grafana_data:/var/lib/grafana
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    networks:
+      - micro_network
+    deploy:
+      mode: global
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8081:80"
+    networks:
+      - micro_network
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+
+networks:
+  micro_network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  userdb_vol:
+  productdb_vol:
+  orderdb_vol:
+  notificationdb_vol:
+  paymentdb_vol:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,101 @@
+# ─── ResourceQuota — limits total resources in namespace ───
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sre-resource-quota
+  namespace: sre-microservices
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: "4Gi"
+    limits.cpu: "8"
+    limits.memory: "8Gi"
+    pods: "30"
+    services: "20"
+    persistentvolumeclaims: "10"
+
+---
+# ─── LimitRange — default limits per container ───
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sre-limit-range
+  namespace: sre-microservices
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "200m"
+        memory: "256Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      max:
+        cpu: "500m"
+        memory: "512Mi"
+
+---
+# ─── NetworkPolicy — allow only intra-namespace traffic ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: sre-microservices
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: sre-microservices
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: sre-microservices
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+---
+# ─── PodDisruptionBudget — ensure availability during rolling updates ───
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: order-api-pdb
+  namespace: sre-microservices
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: order-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: product-api-pdb
+  namespace: sre-microservices
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: product-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-api-pdb
+  namespace: sre-microservices
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payment-api

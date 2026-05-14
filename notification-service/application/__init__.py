@@ -15,8 +15,8 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        from . import models  # import models so tables get created
-        from .product_api import product_api_blueprint
-        app.register_blueprint(product_api_blueprint)
+        from . import models  # must import before create_all
+        from .notification_api import notification_api_blueprint
+        app.register_blueprint(notification_api_blueprint)
         db.create_all()
         return app

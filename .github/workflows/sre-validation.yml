@@ -1,0 +1,90 @@
+name: SRE Health Check & Postmortem
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  # ─── Validate SRE Artifacts ───
+  sre-validation:
+    name: Validate SRE Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check SLI/SLO definitions exist
+        run: |
+          echo "Checking SRE artifacts..."
+          
+          # Check required files
+          files=(
+            "monitoring/prometheus/prometheus.yml"
+            "monitoring/prometheus/alert_rules.yml"
+            "docker-compose.yml"
+            "docker-compose.swarm.yml"
+            "ansible/playbook.yml"
+            "terraform/main.tf"
+            "rollback.py"
+          )
+          
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "✓ $f exists"
+            else
+              echo "✗ MISSING: $f"
+              exit 1
+            fi
+          done
+
+      - name: Count microservices
+        run: |
+          services=("user-service" "product-service" "order-service" "notification-service" "payment-service" "frontend")
+          count=0
+          for s in "${services[@]}"; do
+            if [ -d "$s" ]; then
+              echo "✓ $s"
+              count=$((count + 1))
+            fi
+          done
+          echo "Total microservices: $count"
+          if [ "$count" -lt 6 ]; then
+            echo "ERROR: Need at least 6 microservices, found $count"
+            exit 1
+          fi
+
+      - name: Count Kubernetes manifests
+        run: |
+          count=$(ls kubernetes/*.yaml 2>/dev/null | wc -l)
+          echo "Kubernetes manifests: $count"
+          if [ "$count" -lt 5 ]; then
+            echo "ERROR: Expected at least 5 k8s manifests"
+            exit 1
+          fi
+
+      - name: Validate alert rules count
+        run: |
+          count=$(grep -c "alert:" monitoring/prometheus/alert_rules.yml)
+          echo "Alert rules defined: $count"
+          if [ "$count" -lt 10 ]; then
+            echo "WARNING: Less than 10 alert rules defined"
+          fi
+
+      - name: Generate SRE Summary
+        run: |
+          echo "================================"
+          echo "SRE END-TERM PROJECT SUMMARY"
+          echo "Student: Kaber Daryn | SE-2430"
+          echo "================================"
+          echo ""
+          echo "Microservices: $(ls -d */ | grep -E 'service|frontend' | wc -l)"
+          echo "K8s manifests: $(ls kubernetes/*.yaml | wc -l)"
+          echo "Alert rules:   $(grep -c 'alert:' monitoring/prometheus/alert_rules.yml)"
+          echo "Ansible tasks: $(grep -c '- name:' ansible/playbook.yml)"
+          echo "Terraform resources: $(grep -c 'resource' terraform/main.tf)"
+          echo ""
+          echo "SLOs:"
+          echo "  Availability >= 99% (30 days)"
+          echo "  Latency p95  <= 200ms"
+          echo "  Error rate   <= 1%"

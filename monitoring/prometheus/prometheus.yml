@@ -1,4 +1,4 @@
-﻿global:
+global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
@@ -31,6 +31,16 @@ scrape_configs:
   - job_name: 'order-service'
     static_configs:
       - targets: ['corder-service:5003']
+    metrics_path: '/metrics'
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['cnotification-service:5004']
+    metrics_path: '/metrics'
+
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['cpayment-service:5005']
     metrics_path: '/metrics'
 
   - job_name: 'frontend'
